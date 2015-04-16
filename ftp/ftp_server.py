@@ -34,30 +34,20 @@ class FTPserverThread(threading.Thread):
                 func(cmd)
     def SYST(self,cmd):
         self.conn.send(bytes('215 UNIX Type: L8\r\n', 'UTF-8'))
-    def OPTS(self,cmd):
-        if cmd[5:-2].upper()=='UTF8 ON':
-            self.conn.send(bytes('200 OK.\r\n', 'UTF-8'))
-        else:
-            self.conn.send(bytes('451 Sorry.\r\n', 'UTF-8'))
     def USER(self,cmd):
         self.conn.send(bytes('331 OK.\r\n', 'UTF-8'))
     def FEAT(self,cmd):
-        #print('FEAT')
         self.conn.send(bytes('211 OK.\r\n', 'UTF-8'))
     def PASS(self,cmd):
         self.conn.send(bytes('230 OK.\r\n', 'UTF-8'))
-        #self.conn.send('530 Incorrect.\r\n')
     def QUIT(self,cmd):
         self.conn.send(bytes('221 Goodbye.\r\n', 'UTF-8'))
-    def NOOP(self,cmd):
-        self.conn.send(bytes('200 OK.\r\n', 'UTF-8'))
     def TYPE(self,cmd):
         self.mode=cmd[5]
         self.conn.send(bytes('200 Binary mode.\r\n', 'UTF-8'))
 
     def CDUP(self,cmd):
         if not os.path.samefile(self.cwd,self.basewd):
-            #learn from stackoverflow
             self.cwd=os.path.abspath(os.path.join(self.cwd,'..'))
         self.conn.send(bytes('200 OK.\r\n', 'UTF-8'))
     def PWD(self,cmd):
@@ -77,17 +67,6 @@ class FTPserverThread(threading.Thread):
         else:
             self.cwd=os.path.join(self.cwd,nf)
         self.conn.send(bytes('250 OK.\r\n', 'UTF-8'))
-
-    def PORT(self,cmd):
-        if self.pasv_mode:
-            self.servsock.close()
-            self.pasv_mode = False
-        pr = cmd[5:].decode()
-        print('--%s--' % pr)
-        l=pr.split(',')
-        self.dataAddr='.'.join(l[:4])
-        self.dataPort=(int(l[4])<<8)+int(l[5])
-        self.conn.send(bytes('200 Get port.\r\n', 'UTF-8'))
 
     def PASV(self,cmd):
         self.pasv_mode = True
@@ -155,20 +134,6 @@ class FTPserverThread(threading.Thread):
             self.conn.send('250 File deleted.\r\n')
         else:
             self.conn.send('450 Not allowed.\r\n')
-
-    def RNFR(self,cmd):
-        self.rnfn=os.path.join(self.cwd,cmd[5:-2])
-        self.conn.send('350 Ready.\r\n')
-
-    def RNTO(self,cmd):
-        fn=os.path.join(self.cwd,cmd[5:-2])
-        os.rename(self.rnfn,fn)
-        self.conn.send('250 File renamed.\r\n')
-
-    def REST(self,cmd):
-        self.pos=int(cmd[5:-2])
-        self.rest=True
-        self.conn.send('250 File position reseted.\r\n')
 
     def RETR(self,cmd):
         fn=os.path.join(self.cwd,cmd[5:-2].decode('UTF-8'))

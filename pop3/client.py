@@ -132,60 +132,6 @@ class POP3:
             return self._shortcmd('UIDL %s' % which)
         return self._longcmd('UIDL')
 
-    def print_message(self, num):
-        tmp = Mailbox.retr(num)
-        print('qq')
-        for i in tmp:
-            print(str(i))
-        raw = str(tmp[1])
-        mes = raw.split(',')
-        l = len(mes)
-        message = mes[l-7]
-        print ('Message:' + str(message)[3:-1])
-
-    def print_message1(self):
-        num = input('enter num of msg: ')
-        tmp = Mailbox.retr(num)
-        for i in tmp:
-            print(str(i))
-        raw = str(tmp[1])
-        mes = raw.split(',')
-        l = len(mes)
-        message = mes[l-7]
-        if str(message)[3:-1] != 'Content-Transfer-Encoding: 7bit':
-            print ('Message:' + str(message)[3:-1])
-        else:
-            message = mes[l-2]
-            print ('Message:' + str(message)[3:-1])
-
-    def print_stat(self):
-        num,size=self.stat()
-        print('num=%s, szie=%s' % (str(num), str(size)))
-    def print_list(self):
-        num = input('enter num of msg or press enter: ')
-        if num == '':
-            r,l,o=self.list()
-            for i in l:
-                print(str(i))
-        else:
-            r = self.list(int(num))
-            print(r)
-
-    def print_top(self):
-        msg = input('number of msg:')
-        num = input('number of rows:')
-        r,l,o=self.top(int(msg),int(num))
-        print('%s' % (str(l)))
-    def print_uidl(self):
-        num = input('enter num of msg or press enter: ')
-        if num == '':
-            r,l,o=self.uidl()
-            for i in l:
-                print('%s' % str(i))
-        else:
-            r=self.uidl(int(num))
-            print(r)
-
     def send_user(self):
         userresp = ''
         while not userresp.startswith('b\'+OK'):
@@ -207,10 +153,6 @@ class POP3:
     def uni_cmd(self):
         self.user('sergklimoff')
         self.pass_('KlimovSergey')
-
-    def del_msg(self):
-        num = input('Enter number of msg: ')
-        self.dele(int(num))
 
 if HAVE_SSL:
 
@@ -238,6 +180,62 @@ if HAVE_SSL:
                                             server_hostname=self.host)
             return sock
 
+    class Client:
+
+        def __init__(self, serv, port):
+            self.serv = serv
+            self.port = port
+            self.pop3 = POP3_SSL(self.serv, self.port)
+
+        def del_msg(self):
+            num = input('Enter number of msg: ')
+            self.pop3.dele(int(num))
+
+        def print_top(self):
+            msg = input('number of msg:')
+            num = input('number of rows:')
+            r,l,o=self.pop3.top(int(msg),int(num))
+            print('%s' % (str(l)))
+
+        def print_list(self):
+            num = input('enter num of msg or press enter: ')
+            if num == '':
+                r,l,o=self.pop3.list()
+                for i in l:
+                    print(str(i))
+            else:
+                r = self.pop3.list(int(num))
+                print(r)
+
+        def print_stat(self):
+            num,size=self.pop3.stat()
+            print('num=%s, szie=%s' % (str(num), str(size)))
+
+        def print_message1(self):
+            num = input('enter num of msg: ')
+            tmp = self.pop3.retr(num)
+            for i in tmp:
+                print(str(i))
+            raw = str(tmp[1])
+            mes = raw.split(',')
+            l = len(mes)
+            message = mes[l-7]
+            if str(message)[3:-1] != 'Content-Transfer-Encoding: 7bit':
+                print ('Message:' + str(message)[3:-1])
+            else:
+                message = mes[l-2]
+                print ('Message:' + str(message)[3:-1])
+
+        def print_uidl(self):
+            num = input('enter num of msg or press enter: ')
+            if num == '':
+                r,l,o=self.pop3.uidl()
+                for i in l:
+                    print('%s' % str(i))
+            else:
+                r=self.pop3.uidl(int(num))
+                print(r)
+
 if __name__ == "__main__":
 
     serv = input('Enter pop server:')
@@ -248,19 +246,21 @@ if __name__ == "__main__":
         port = '995'
     #Mailbox = POP3_SSL('pop.yandex.ru', '995')
     #cmds = ['stat','list','retr','dele','top','uidl','rset','quit']
-    Mailbox = POP3_SSL(serv, port)
+
+    cli = Client(serv, port)
+
     cds = {
-        'uni' : Mailbox.uni_cmd,
-        'user' : Mailbox.send_user,
-        'pass' : Mailbox.send_pass,
-        'stat' : Mailbox.stat,
-        'retr' : Mailbox.print_message1,
-        'list' : Mailbox.print_list,
-        'top' : Mailbox.print_top,
-        'uidl' : Mailbox.print_uidl,
-        'quit' : Mailbox.quit,
-        'dele' : Mailbox.del_msg,
-        'rset' : Mailbox.rset,
+        'uni' : cli.pop3.uni_cmd,
+        'user' : cli.pop3.send_user,
+        'pass' : cli.pop3.send_pass,
+        'stat' : cli.print_stat,
+        'retr' : cli.print_message1,
+        'list' : cli.print_list,
+        'top' : cli.print_top,
+        'uidl' : cli.print_uidl,
+        'quit' : cli.pop3.quit,
+        'dele' : cli.del_msg,
+        'rset' : cli.pop3.rset,
         }
     cmd = ''
 
