@@ -35,12 +35,9 @@ class POP3:
     def _create_socket(self, timeout):
         return socket.create_connection((self.host, self.port), timeout)
 
-    def _putline(self, line):
-        self.sock.sendall(line + CRLF)
-
     def _putcmd(self, line):
         line = bytes(line, self.encoding)
-        self._putline(line)
+        self.sock.sendall(line + CRLF)
 
     def _getline(self):
         line = self.file.readline(_MAXLINE + 1)
@@ -132,27 +129,13 @@ class POP3:
             return self._shortcmd('UIDL %s' % which)
         return self._longcmd('UIDL')
 
-    def send_user(self):
-        userresp = ''
-        while not userresp.startswith('b\'+OK'):
-            user = input('Enter your login:')
-            if user == '1':
-                userresp = str(self.user('sergklimoff'))
-            else:
-                userresp = str(self.user(user))
-
-    def send_pass(self):
-        passresp = ''
-        while not passresp.startswith('b\'+OK'):
-            passwd = input('Enter your password:')
-            if passwd == '1':
-                passresp = str(self.pass_('KlimovSergey'))
-            else:
-                passresp = str(self.pass_(passwd))
-
     def uni_cmd(self):
-        self.user('sergklimoff')
-        self.pass_('KlimovSergey')
+        f = open('login.txt','r')
+        for line in f:
+            usr = line.split(' ')[0]
+            paswd = line.split(' ')[1]
+        self.user(usr)
+        self.pass_(paswd)
 
 if HAVE_SSL:
 
@@ -236,6 +219,18 @@ if HAVE_SSL:
                 r=self.pop3.uidl(int(num))
                 print(r)
 
+        def send_user(self):
+            userresp = ''
+            while not userresp.startswith('b\'+OK'):
+                user = input('Enter your login:')
+                userresp = str(self.pop3.user(user))
+
+        def send_pass(self):
+            passresp = ''
+            while not passresp.startswith('b\'+OK'):
+                passwd = input('Enter your password:')
+                passresp = str(self.pop3.pass_(passwd))
+
 if __name__ == "__main__":
 
     serv = input('Enter pop server:')
@@ -251,8 +246,8 @@ if __name__ == "__main__":
 
     cds = {
         'uni' : cli.pop3.uni_cmd,
-        'user' : cli.pop3.send_user,
-        'pass' : cli.pop3.send_pass,
+        'user' : cli.send_user,
+        'pass' : cli.send_pass,
         'stat' : cli.print_stat,
         'retr' : cli.print_message1,
         'list' : cli.print_list,

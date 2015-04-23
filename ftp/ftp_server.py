@@ -1,4 +1,4 @@
-import os,socket,threading,time,sys
+import os,socket,threading,time,sys, logging
 
 allow_delete = False
 local_ip = socket.gethostbyname(socket.gethostname())
@@ -14,32 +14,69 @@ class FTPserverThread(threading.Thread):
         self.basewd=currdir
         self.cwd=self.basewd
         self.rest=False
-        self.pasv_mode=False
         threading.Thread.__init__(self)
         self.mode = ''
+        self.users = {}
+        self.user = ''
+        logging.basicConfig(format = u'%(levelname)-8s [%(asctime)s] %(message)s', level = logging.DEBUG, filename = u'mylog.log')
         #print(os.path.abspath('.'))
 
     def run(self):
+        self.load_usrs()
         self.conn.send(bytes('220 Welcome!\r\n', 'UTF-8'))
         while True:
             cmd=self.conn.recv(256)
+            logging.info(cmd)
             if not cmd: break
             else:
-                print ('Recieved:',cmd)
+                #print ('Recieved:',cmd)
                 pr1 = cmd[:4].decode('UTF-8')
                 pr2 = pr1.strip()
                 pr = pr2.upper()
-                print('__%s__' % str(pr))
+                #print('__%s__' % str(pr))
                 func = getattr(self, pr)
                 func(cmd)
+
+    def load_usrs(self):
+        f = open('users.cfg','r')
+        for line in f:
+            self.users[line.split(" ")[0]] = line.split(" ")[1]
+
+    def check_user(self,usrnm):
+        for i in self.users:
+            if i == usrnm:
+                self.user = usrnm
+                return True
+        return False
+
+    def check_pass(self,paswd):
+        if self.users[self.user] == paswd:
+            return True
+        else:
+            return False
+
     def SYST(self,cmd):
         self.conn.send(bytes('215 UNIX Type: L8\r\n', 'UTF-8'))
     def USER(self,cmd):
-        self.conn.send(bytes('331 OK.\r\n', 'UTF-8'))
+        if cmd.decode('UTF-8').split(" ")[1].split("\r\n")[0] == 'anonymous':
+            self.user = 'anonymous'
+            self.conn.send(b'331 OK.\r\n')
+        elif self.check_user(cmd.decode('UTF-8').split(" ")[1].split("\r\n")[0]):
+            self.conn.send(b'331 OK.\r\n')
+        else:
+            self.conn.send(b'530 Login is incorrect\r\n')
+
     def FEAT(self,cmd):
         self.conn.send(bytes('211 OK.\r\n', 'UTF-8'))
     def PASS(self,cmd):
-        self.conn.send(bytes('230 OK.\r\n', 'UTF-8'))
+        if self.user == 'anonymous':
+            self.conn.send(b'230 OK.\r\n')
+        else:
+            if self.check_pass(cmd.decode('UTF-8').split(" ")[1].split("\r\n")[0]+'\n'):
+                self.conn.send(b'230 OK.\r\n')
+            else:
+                self.conn.send(b'530 Password is incorrect\r\n')
+
     def QUIT(self,cmd):
         self.conn.send(bytes('221 Goodbye.\r\n', 'UTF-8'))
     def TYPE(self,cmd):
@@ -69,7 +106,6 @@ class FTPserverThread(threading.Thread):
         self.conn.send(bytes('250 OK.\r\n', 'UTF-8'))
 
     def PASV(self,cmd):
-        self.pasv_mode = True
         self.servsock = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
         self.servsock.bind((local_ip,0))
         self.servsock.listen(1)
@@ -79,17 +115,12 @@ class FTPserverThread(threading.Thread):
                 (','.join(ip.split('.')), port>>8&0xFF, port&0xFF),'UTF-8'))
 
     def start_datasock(self):
-        if self.pasv_mode:
-            self.datasock, addr = self.servsock.accept()
-            print ('connect:', addr)
-        else:
-            self.datasock=socket.socket(socket.AF_INET,socket.SOCK_STREAM)
-            self.datasock.connect((self.dataAddr,self.dataPort))
+        self.datasock, addr = self.servsock.accept()
+        print ('connect:', addr)
 
     def stop_datasock(self):
         self.datasock.close()
-        if self.pasv_mode:
-            self.servsock.close()
+        self.servsock.close()
 
     def LIST(self,cmd):
         self.conn.send(bytes('150 Here comes the directory listing.\r\n','UTF-8'))
